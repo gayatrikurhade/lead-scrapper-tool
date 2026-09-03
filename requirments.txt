@@ -1,0 +1,7 @@
+streamlit
+requests
+BeautifulSoup4
+pandas
+openpyxl
+playwright
+pycountry
