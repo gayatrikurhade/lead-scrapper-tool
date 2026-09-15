@@ -1,8 +1,8 @@
 from website_crawler import analyze_website
 
-company = "Tata Consultancy Services"
+company = "Kunash Media Solution"
 
-website = "https://www.tcs.com"
+website = "https://kunashmedia.com/"
 
 print("\nStarting website crawler...")
 print("----------------------------------------")

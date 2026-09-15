@@ -4,3 +4,7 @@ __pycache__/
 *.xlsx
 log.txt
 seen_leads.json
+daily_usage.json
+leads_history.json
+settings.json
+
