@@ -98,8 +98,7 @@ def inject_css():
         '+ div[data-testid="stElementContainer"]'
     )
     SEARCH_URI = _svg_uri("search", COLORS["text_muted"])
-    # data URI of the "<<" chevrons icon, always black, used for both the
-    # open-sidebar collapse button and the closed-sidebar expand button
+    
     CHEVRONS_URI = _svg_uri("chevrons_left", COLORS["text_dark"])
 
     st.markdown(
@@ -613,7 +612,7 @@ def inject_css():
             padding: 10px 12px 22px 12px;
         }}
         .dash-panel-title {{ font-size: 16px; margin: 6px 4px 8px 4px; }}
-
+        
         </style>
         """,
         unsafe_allow_html=True,
