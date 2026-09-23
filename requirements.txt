@@ -5,4 +5,6 @@ pandas
 openpyxl
 playwright
 pycountry
+plotly
+
 
