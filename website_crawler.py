@@ -12,7 +12,8 @@ from scrapy_bridge import crawl_with_scrapy
 
 DEFAULT_MAX_PAGES = 5
 PAGE_TIMEOUT = 15000
-PAGE_WAIT_MS = 500
+PAGE_WAIT_MS = 200
+
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -101,6 +102,20 @@ def crawl_website(
                 viewport={"width": 1366,
                           "height": 768},
                 user_agent=USER_AGENT )
+
+            page.route(
+                "**/*",
+                lambda route:(
+                    route.abort()
+                    if route.request.resource_type in [
+                        "image",
+                        "media",
+                        "font"
+                    ]
+                    else route.continue_()
+                )
+            )
+            
             while ((priority_queue or normal_queue)
                 and len(pages) < max_pages):
                 if priority_queue:
@@ -1004,6 +1019,11 @@ def analyze_website(
     website,
     max_pages=DEFAULT_MAX_PAGES
 ):
+
+    scrapy_time= 0
+    playwright_time = 0
+    linkedin_time = 0
+
     print(
         f"\n[ANALYZING] {company}"
     )
@@ -1022,10 +1042,15 @@ def analyze_website(
     
     print("[CRAWLER] Trying Scrapy first...")
 
+    scrapy_start = time.perf_counter()
+
     scrapy_pages = crawl_with_scrapy(
     website,
     max_pages=max_pages
     )
+
+    scrapy_time = time.perf_counter() - scrapy_start
+    print(f"[TIME] Scrapy:{scrapy_time:.2f} seconds")
 
     if scrapy_pages:
        print(
@@ -1088,27 +1113,41 @@ def analyze_website(
            ", ".join(missing_fields)
            if missing_fields
            else "None"
+        )
     )
-)
-    if missing_fields:
+
+    needs_playwright = (
+        not emails
+        or not phones
+        or director == "Not Found"
+    )
+    playwright_pages = []
+    
+    if needs_playwright:
+
+        print("[CRAWLER] Some fields are missing.")
+        print("[CRAWLER] Using Playwright as fallback...")
+
+        playwright_start = time.perf_counter()
+
+        playwright_pages = crawl_website(
+            website,
+            max_pages=max_pages
+        )
+
+        playwright_time = time.perf_counter() - playwright_start
 
         print(
-        "[CRAWLER] Some fields are missing."
-    )
-    print(
-        "[CRAWLER] Using Playwright as fallback..."
-    )
-    playwright_pages = crawl_website(
-        website,
-        max_pages=max_pages
-    )
+            f"[TIME] playwright fallback:"
+            f"{playwright_time:.2f} seconds"
+        )
+
     if playwright_pages:
 
         print(
             f"[PLAYWRIGHT] Returned "
             f"{len(playwright_pages)} pages"
         )
-
         pages = pages + playwright_pages
 
         emails = extract_emails(pages)
@@ -1116,15 +1155,29 @@ def analyze_website(
         director = extract_director(pages)
         linkedin_url = extract_linkedin_url(pages)
         linkedin_followers = get_followers(pages)
+
+    else:
+        print(
+            "[CRAWLER] Core fields found by Scrapy."
+            "Skipping Playwright fallback."
+        )
         
     if linkedin_followers == "Not Found":
 
-        print(
-            "[CRAWLER] Trying Linkedin follower fallback..."
-        )
+        print("[CRAWLER] Trying Linkedin follower fallback...")
+
+        linkedin_start = time.perf_counter()
+
         linkedin_followers = fetch_linkedin_followers(
             linkedin_url,
             company
+        )
+
+        linkedin_time = time.perf_counter() - linkedin_start
+
+        print(
+            f"[TIME] LinkedIn extraction:"
+            f"{linkedin_time:.2f} seconds"
         )
 
     return {
@@ -1147,7 +1200,13 @@ def analyze_website(
         "LinkedIn URL":
             linkedin_url,
         "LinkedIn Followers":
-            linkedin_followers
+            linkedin_followers,
+
+        "_timing": {
+            "scrapy": scrapy_time,
+            "playwright": playwright_time,
+            "linkedin": linkedin_time
+        }
     }
 if __name__ == "__main__":
     print(

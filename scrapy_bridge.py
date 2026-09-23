@@ -14,18 +14,15 @@ SCRAPY_PROJECT = os.path.join(
 def crawl_with_scrapy(website, max_pages=5):
 
     print("[SCRAPY] Starting:", website)
-
     temp_file = tempfile.NamedTemporaryFile(
         delete=False,
         suffix=".json"
     )
 
     temp_file.close()
-
     print("[SCRAPY] Temp file:", temp_file.name)
 
     try:
-
         command = [
             sys.executable,
             "-m",
@@ -41,7 +38,6 @@ def crawl_with_scrapy(website, max_pages=5):
         ]
 
         print("[SCRAPY] Running command...")
-
         result = subprocess.run(
             command,
             cwd=SCRAPY_PROJECT,
@@ -77,22 +73,17 @@ def crawl_with_scrapy(website, max_pages=5):
         pages = []
 
         for item in data:
-
             html = item.get("raw_html", "")
-
             if not html:
                 continue
-
             soup = BeautifulSoup(
                 html,
                 "html.parser"
             )
-
             for tag in soup.find_all(
                 ["script", "style", "noscript"]
             ):
                 tag.decompose()
-
             text = soup.get_text(
                 " ",
                 strip=True
@@ -118,7 +109,6 @@ def crawl_with_scrapy(website, max_pages=5):
             type(e).__name__,
             str(e)
         )
-
         return []
 
     finally:

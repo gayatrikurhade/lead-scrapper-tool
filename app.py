@@ -267,9 +267,9 @@ def load_settings():
     return dict(DEFAULT_SETTINGS)
 
 def save_settings(settings):
-    
+
     try:
-        with open(SETTINGS_FILE,"W",encoding="utf-8") as f:
+        with open(SETTINGS_FILE,"w",encoding="utf-8") as f:
             json.dump(settings,f,ensure_ascii=False,indent=2)
 
     except Exception as e:
@@ -503,7 +503,7 @@ def render_progress_bar(
 with st.sidebar:
     sidebar_brand(
         "Kunash Media Solution",
-        "Lead Generation")
+        "Lead Scrapper Tool")
 
     page = sidebar_nav(
         items=["Dashboard","Search","Results","Settings"],
@@ -524,13 +524,16 @@ calls_left = max( total_calls_allowed_today - usage["calls"],
 if page == "Dashboard":
     topbar(
         "Dashboard",
-        subtitle="Lead Scrapper Tool")
+        subtitle="Lead Analysis • Company Scoring • Priority Identification")
 
     total_all_time = sum(
         h.get("count", 0)
         for h in history)
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4 = st.columns(
+        [1,1,1,1],
+        gap="small"
+    )
     with c1:
         icon_stat_card(
             "Total Leads Collected",
@@ -595,28 +598,35 @@ if page == "Dashboard":
                         marker=dict(
                             color=COLORS["accent"] ),
                         fill="tozeroy",
-                        fillcolor="rgba(0,210,196,0.12)"))
+                        fillcolor="rgba(249,138,27,0.16)"))
                 fig.update_layout(
-                    height=320,
+                    height=280,
                     margin=dict(
-                        l=10,
+                        l=45,
                         r=10,
                         t=10,
-                        b=10),
+                        b=35),
                     plot_bgcolor=COLORS["card_bg"],
                     paper_bgcolor=COLORS["card_bg"],
                     font=dict(
                         color=COLORS["text_dark"]),
                     xaxis=dict(
-                        color=COLORS["text_muted"],
-                        gridcolor=COLORS["card_border"]),
+                        color=COLORS["text_dark"],
+                        gridcolor=COLORS["card_border"],
+                        tickfont=dict(
+                            color=COLORS["text_dark"],
+                            size=13)),
                     yaxis=dict(
                         showgrid=True,
                         gridcolor=COLORS["card_border"],
-                        color=COLORS["text_muted"]))
+                        color=COLORS["text_dark"],
+                        tickfont=dict(
+                            color=COLORS["text_dark"],
+                            size=13)))
                 st.plotly_chart(
                     fig,
-                    use_container_width=True)
+                    use_container_width=True,
+                    theme=None)
             else:
                 st.caption(
                     "Install `plotly` to see this chart.")
@@ -642,12 +652,12 @@ if page == "Dashboard":
                         textfont=dict(
                             color=COLORS["text_dark"]) ))
                 fig2.update_layout(
-                    height=320,
+                    height=280,
                     margin=dict(
-                        l=10,
+                        l=45,
                         r=10,
                         t=10,
-                        b=10),
+                        b=35),
 
                     plot_bgcolor=COLORS["card_bg"],
                     paper_bgcolor=COLORS["card_bg"],
@@ -659,7 +669,8 @@ if page == "Dashboard":
                     ))
                 st.plotly_chart(
                     fig2,
-                    use_container_width=True)
+                    use_container_width=True,
+                    theme=None)
             else:
                 st.caption("Run a search to see this breakdown.")
 elif page == "Search":
@@ -864,6 +875,7 @@ elif page == "Search":
         from website_crawler import analyze_website
 
         def crawl_company(place):
+            timing = {}
             name = (
                 place
                 .get("displayName", {})
@@ -879,6 +891,9 @@ elif page == "Search":
                         website=website,
                         max_pages=5
                     )
+
+                    timing = website_data.pop("_timing",{})
+
                 except Exception as e:
                     print(f"[CRAWLER ERROR] {name}: {e}")
 
@@ -898,7 +913,7 @@ elif page == "Search":
                      "LinkedIn Followers": "Not Available"
                 }
 
-            return place, website_data
+            return place, website_data, timing
 
         get_current_usage.clear()
         usage = load_usage()
@@ -991,6 +1006,15 @@ elif page == "Search":
             retry_count = 0
             max_retries = 3
             duplicates_skipped = 0
+
+            search_queries = [
+                f"{keyword} in {location}",
+                f"{keyword} company in {location}",
+                f"{keyword} services in {location}",
+                f"{keyword} firms in {location}",
+            ]
+            query_index = 0 
+            current_query = search_queries[query_index]
             while len(data_list) < count:
                 remaining = (
                     count
@@ -999,8 +1023,7 @@ elif page == "Search":
                     20,
                     remaining)
                 data = {
-                    "textQuery":
-                        f"{keyword} in {location}",
+                    "textQuery": current_query,
                     "pageSize":
                         page_size}
                 if page_token:
@@ -1059,26 +1082,40 @@ elif page == "Search":
                         "Google Maps API completed in "
                         f"{google_time:.2f} seconds.",
                         console_placeholder)
-                elif response.status_code == 503:
+                    
+                elif response.status_code in (500,502,503,504):
                     retry_count += 1
                     log(
-                        "Google API returned 503 after "
+                        "Google API returned "
+                        f"{response.status_code} after "
                         f"{google_time:.2f} seconds.",
                         console_placeholder)
+                    
                     if retry_count > max_retries:
+
+                        log(
+                            "Google API failed after "
+                            f"{max_retries} retries.",
+                            console_placeholder
+                        )
                         st.error(
                             "Google Places API is temporarily "
-                            "unavailable after several retries.")
+                            "unavailable. Please try again later.")
                         st.code(
                             response.text)
  
                         break
+
+                    retry_delay = 2 ** (retry_count - 1)
                     log(
                         f"Retrying Google API "
-                        f"({retry_count}/{max_retries})...",
+                        f"({retry_count}/{max_retries}) "
+                        f"after {retry_delay} seconds...",
                         console_placeholder)
-                    time.sleep(3)
+                    
+                    time.sleep(retry_delay)
                     continue
+
                 else:
                     log(
                         f"Google API error: "
@@ -1095,6 +1132,7 @@ elif page == "Search":
                         response.text)
  
                     break
+                
                 results = response.json()
                 log(
                     "Google Maps API response received.",
@@ -1222,20 +1260,15 @@ elif page == "Search":
 
                     company_name = (
                         place
-                        .get(
-                            "displayName",
-                            {})
-                        .get(
-                            "text",
-                            "N/A"
-                        )
+                        .get("displayName",{})
+                        .get("text","N/A")
                     )
 
                     crawl_start = perf_counter()
 
                     try:
 
-                        _, website_data = crawl_company(
+                        _, website_data, timing = crawl_company(
                             place
                         )
 
@@ -1248,7 +1281,8 @@ elif page == "Search":
                             place,
                             website_data,
                             crawl_time,
-                            None
+                            None,
+                            timing
                         )
 
                     except Exception as e:
@@ -1282,7 +1316,8 @@ elif page == "Search":
                             place,
                             website_data,
                             crawl_time,
-                            e
+                            e,
+                            {}
                         )
 
                 crawl_results = {}
@@ -1365,7 +1400,8 @@ elif page == "Search":
                                 place,
                                 website_data,
                                 crawl_time,
-                                error
+                                error,
+                                timing
                             ) = future.result()
 
                             name = (
@@ -1393,6 +1429,14 @@ elif page == "Search":
                                 name,
                                 address,
                                 website
+                            )
+
+                            log(
+                                f"[TIME] {name} | "
+                                f"Scrapy: {timing.get('scrapy',0):.2f}s | "
+                                f"Playwright: {timing.get('playwright',0):.2f}s | "
+                                f"LinkedIn: {timing.get('linkedin',0):.2f}s",
+                                console_placeholder
                             )
 
                             if error is not None:
@@ -1615,14 +1659,32 @@ elif page == "Search":
 
                 page_token = results.get(
                     "nextPageToken")
-                
-                page_number += 1
-                if not page_token:
+
+                if page_token:
+                    page_number += 1
+                    continue
+
+                if len(data_list) < count and query_index <  len(search_queries) - 1:
+                    query_index += 1
+                    current_query = search_queries[query_index]
+
+                    page_token = None
+                    page_number = 1
+
                     log(
-                        "STOPPED: Google Maps did not "
-                        "return a nextPageToken.",
-                        console_placeholder)
-                    break
+                        f"No more pages for current search."
+                        f"Trying related search:{current_query}",
+                        console_placeholder
+                    )
+                    continue
+
+                log(
+                    f"STOPPED: No more search result available."
+                    f"Collected {len(data_list)} of {count} requested.",
+                    console_placeholder
+                )
+                break
+                
             total_time = (
                 perf_counter()
                 - total_start)
@@ -1959,4 +2021,5 @@ elif page == "Settings":
             f"{calls_left}")
     st.caption(
         "Usage resets automatically at midnight (00:00).")
- 
+    
+    

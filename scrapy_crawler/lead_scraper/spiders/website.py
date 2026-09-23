@@ -1,4 +1,5 @@
 import scrapy
+import time
 from urllib.parse import urljoin, urlparse
 
 CONTACT_KEYWORDS = [
@@ -72,6 +73,23 @@ class WebsiteSpider(scrapy.Spider):
 
     def parse(self, response):
 
+        page_start = time.perf_counter()
+
+        content_type = response.headers.get(
+            b"Content-type",
+            b""
+        ).decode(
+            "utf-8",
+            errors="ignore"
+        ).lower()
+
+        if "text/html" not in content_type:
+            print(
+                f"[SCRAPY] Skipping non-HTML response: "
+                f"{response.url} | {content_type}"
+            )
+            return
+
         if self.pages_crawled >= self.max_pages:
             return
         current_url = (
@@ -97,6 +115,15 @@ class WebsiteSpider(scrapy.Spider):
             "url": current_url,
             "raw_html": response.text
         }
+
+        page_time = time.perf_counter() - page_start
+
+        print(
+            f"[SCRAPY TIME] Page "
+            f"{self.pages_crawled}/{self.max_pages} "
+            f"{current_url} = "
+            f"{page_time:.2f} seconds"
+        )
 
         if self.pages_crawled >= self.max_pages:
             return
@@ -131,6 +158,21 @@ class WebsiteSpider(scrapy.Spider):
                 .split("#")[0]
                 .rstrip("/")
             )
+            if "add-to-cart=" in full_url.lower():
+                continue
+
+            skip_keywords = [
+                "/my-account",
+                "/cart",
+                "/checkout",
+                "/wishlist",
+            ]
+
+            if any(
+                keyword in full_url.lower()
+                for keyword in skip_keywords
+            ):
+                continue
 
             if not self.is_same_domain(
                 self.start_url,
