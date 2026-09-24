@@ -697,7 +697,7 @@ def inject_css():
                 height: auto !important;
             }}
         }}
-        </style> )
+        </style> 
         """,
         unsafe_allow_html=True,
     )
