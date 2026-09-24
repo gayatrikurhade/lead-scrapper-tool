@@ -115,6 +115,8 @@ def inject_css():
             padding-top: 0.8rem !important;
         }}
 
+        #stSidebarCollapseButton{{visibility:visible;}}
+
         [data-testid="stMainBlockContainer"] > div {{
             padding-top: 0 !important;
         }}
@@ -150,7 +152,7 @@ def inject_css():
              - [data-testid="stSidebarCollapseButton"]     (some versions)
              - section[data-testid="stSidebar"] button[kind="header"]
            ================================================================ */
-        [data-testid="collapsedControl"] button,
+        [data-testid="collapsedControl"],
         [data-testid="stSidebarCollapseButton"] > button,
         section[data-testid="stSidebar"] button[kind="header"] {{
             display: flex !important;
@@ -173,9 +175,10 @@ def inject_css():
 
             padding: 0 !important;
             opacity: 1 !important;
-            margin-top: 6px !important;
-            position: relative !important;
-            z-index: 999 !important;
+            visibility: visible !important;
+            
+            z-index: 99999 !important;
+
 
             box-shadow: 0 3px 10px rgba(249, 115, 22, 0.20) !important;
         }}

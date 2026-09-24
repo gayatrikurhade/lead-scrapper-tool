@@ -4,6 +4,8 @@ import requests
 import time
 import json
 import os
+import pycountry
+from io import BytesIO
 from time import perf_counter
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -29,6 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded")
 
 inject_css()
+PAGE_LOAD_START = perf_counter()
 
 ICONS = {
     "users": '''<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"
@@ -160,12 +163,28 @@ def get_country_code(country_name):
 @st.cache_data(ttl=86400,show_spinner=False)
 def get_country_names():
     return sorted(
-        c["name"] for c in get_all_csc_countries()
-        if c.get("name")
+        country.name
+        for country in pycountry.countries
     )
 
 @st.cache_data(ttl=86400,show_spinner = False)
 def get_states_for_country(country_name):
+
+    if country_name == "India":
+        states = []
+
+        for subdivision in pycountry.subdivisions:
+            if subdivision.code.startswith("IN-"):
+                states.append({
+                    "name": subdivision.name,
+                    "iso2": subdivision.code.split("-")[-1]
+                })
+
+        return sorted(
+            states,
+            key=lambda x: x["name"].lower()
+        )
+    
     code = get_country_code(country_name)
     if not code:
         return []
@@ -175,16 +194,31 @@ def get_states_for_country(country_name):
     )
 
 @st.cache_data(ttl=86400 , show_spinner =False)
-def get_cities_for_state(country_name, state_code):
+def get_city_names_for_state(country_name, state_code):
     country_code = get_country_code(country_name)
+
     if not country_code or not state_code:
         return []
-    return sorted(
-        csc_get(
-            f"/countries/{country_code}/states/{state_code}/cities"
-        ),
-        key=lambda x: x.get("name", "").lower()
+
+    city_api_start = perf_counter()
+    cities = csc_get(
+        f"/countries/{country_code}/states/{state_code}/cities"
     )
+    print(
+        f"[SEARCH LOAD] City API: "
+        f"{perf_counter() - city_api_start:.3f}s"
+    )
+
+    return sorted(
+        [
+            c.get("name")
+            for c in cities
+            if c.get("name")
+        ],
+        key=lambda x: x.lower()
+    )
+    
+
 def load_seen_leads():
 
     if os.path.exists(SEEN_LEADS_FILE):
@@ -513,8 +547,18 @@ settings = get_app_settings()
 usage = get_current_usage()
 history = get_history()
 
+print(
+    f"[PAGE LOAD] Settings/usage/history:"
+    f"{perf_counter() - PAGE_LOAD_START:.3f}s"
+)
+
 remaining_today = max(settings["daily_limit"] - usage["used"],
                     0)
+
+print(
+    f"[PAGE LOAD] Befoore page rendering:"
+    f"{perf_counter() - PAGE_LOAD_START:.3f}s"
+)
 
 total_calls_allowed_today = (settings["max_calls_per_day"]
                              + usage.get("extra_calls", 0))
@@ -706,8 +750,15 @@ elif page == "Search":
             st.caption(
                 "e.g. Manufacturing, IT Services, "
                 "Textile, Construction")
-            
+
+            country_load_start = perf_counter()
+            csc_start = perf_counter()
             country_options = get_country_names()
+
+            print(
+                f"[SEARCH LOAD] Country list:"
+                f"{perf_counter() - country_load_start:.3f}s"
+            )
 
             country = st.selectbox(
                 "Country",
@@ -725,7 +776,13 @@ elif page == "Search":
             state_code = None
 
             if country != PLACEHOLDER:
+                state_load_start = perf_counter()
                 state_records = get_states_for_country(country)
+
+                print(
+                    f"[SEARCH LOAD] State list:"
+                    f"{perf_counter() - state_load_start:.3f}s"
+                )
 
                 if state_records:
                     state_names = [
@@ -761,15 +818,10 @@ elif page == "Search":
                 and state != PLACEHOLDER
                 and state_code
             ):
-                city_records = get_cities_for_state(
+                city_names = get_city_names_for_state(
                     country,
                     state_code,
                 )
-
-                city_names = [
-                    c["name"] for c in city_records
-                    if c.get("name")
-                ]
 
                 if city_names:
                     city = st.selectbox(
@@ -863,15 +915,16 @@ elif page == "Search":
                     if usage.get("extra_calls", 0) > 0
                     else ""),
                 icon=ICONS["search"])
-    progress_bar = st.empty()
-    render_progress_bar(
-        progress_bar,
-        0,
-        "Waiting to start...")
- 
-    console_placeholder = st.empty()
 
     if search_button:
+        progress_bar = st.empty()
+        render_progress_bar(
+            progress_bar,
+            0,
+            "Startinng to search...")
+ 
+        console_placeholder = st.empty()
+
         from website_crawler import analyze_website
 
         def crawl_company(place):
@@ -1901,25 +1954,31 @@ elif page == "Results":
                 mime="text/csv",
                 use_container_width=True)
         with dl2:
-            excel_file = (
-                "lead_scrapper_data.xlsx")
-            df.to_excel(
-                excel_file,
-                index=False)
-            with open(
-                excel_file,
-                "rb"
-            ) as file:
-                excel_data = file.read()
+            excel_buffer = BytesIO()
+
+            with pd.ExcelWriter(
+                excel_buffer,
+                engine="openpyxl"
+            ) as writer:
+                df.to_excel(
+                    writer,
+                    index=False,
+                    sheet_name="Leads"
+                )
+
             st.download_button(
                 label="Download Excel",
-                data=excel_data,
-                file_name=excel_file,
+                data=excel_buffer.getvalue(),
+                file_name="lead_scrapper_data.xlsx",
                 mime=(
                     "application/"
                     "vnd.openxmlformats-officedocument."
-                    "spreadsheetml.sheet"),
-                use_container_width=True )
+                    "spreadsheetml.sheet"
+                ),
+                use_container_width=True
+            )
+            
+            
 elif page == "Settings":
     topbar(
         "Settings",
