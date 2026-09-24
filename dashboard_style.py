@@ -615,8 +615,89 @@ def inject_css():
             padding: 10px 12px 22px 12px;
         }}
         .dash-panel-title {{ font-size: 16px; margin: 6px 4px 8px 4px; }}
-        
-        </style>
+
+        /* =========================
+           MOBILE RESPONSIVE DESIGN
+           ========================= */
+
+        @media (max-width: 768px) {{
+
+            /* Main page */
+            [data-testid="stAppViewContainer"] .main .block-container {{
+                max-width: 100% !important;
+                width: 100% !important;
+                padding: 1rem !important;
+                margin: 0 !important;
+            }}
+
+            /* Prevent horizontal overflow */
+            [data-testid="stAppViewContainer"] {{
+                overflow-x: hidden !important;
+            }}
+
+            /* Main content */
+            section.main {{
+                width: 100% !important;
+                margin-left: 0 !important;
+            }}
+
+            /* Stack columns vertically */
+            [data-testid="stHorizontalBlock"] {{
+                flex-wrap: wrap !important;
+                gap: 1rem !important;
+            }}
+
+            [data-testid="column"] {{
+                width: 100% !important;
+                min-width: 100% !important;
+                flex: 1 1 100% !important;
+            }}
+
+            /* Search/input boxes */
+            div[data-baseweb="input"],
+            div[data-baseweb="base-input"] {{
+                width: 100% !important;
+                max-width: 100% !important;
+            }}
+
+            div[data-baseweb="input"] input,
+            div[data-baseweb="base-input"] input {{
+                font-size: 14px !important;
+            }}
+
+            /* Dashboard headings */
+            h1 {{
+                font-size: 28px !important;
+                line-height: 1.2 !important;
+            }}
+
+            h2 {{
+                font-size: 22px !important;
+            }}
+
+            h3 {{
+                font-size: 18px !important;
+            }}
+
+            /* KPI cards */
+            [data-testid="stMetric"] {{
+                width: 100% !important;
+            }}
+
+            /* Charts */
+            .js-plotly-plot,
+            .plot-container {{
+                width: 100% !important;
+                max-width: 100% !important;
+            }}
+
+            /* Images */
+            img {{
+                max-width: 100% !important;
+                height: auto !important;
+            }}
+        }}
+        </style> )
         """,
         unsafe_allow_html=True,
     )
